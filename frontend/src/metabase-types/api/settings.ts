@@ -1,3 +1,4 @@
+// Modified by HudHud Maps, 2026-11-21: Keycloak sign-in types (AGPL).
 import type { ReactNode } from "react";
 
 import type { InputSettingType } from "./actions";
@@ -616,6 +617,9 @@ interface PublicSettings {
   engines: Record<EngineKey, Engine>;
   "google-auth-client-id": string | null;
   "google-auth-enabled": boolean;
+  // HudHud Maps, 2026-11-21: Keycloak sign-in settings (AGPL)
+  "keycloak-auth-enabled": boolean;
+  "hudhud-build-source-url": string | null;
   "has-user-setup": boolean;
   "help-link": HelpLinkSetting;
   "help-link-custom-destination": string;

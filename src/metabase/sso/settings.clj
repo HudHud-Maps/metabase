@@ -1,3 +1,4 @@
+;; Modified by HudHud Maps, 2026-11-21: sso-source-enabled? knows the :keycloak source (Keycloak sign-in, AGPL; see metabase.sso.providers.keycloak).
 (ns metabase.sso.settings
   (:require
    [clojure.string :as str]
@@ -318,6 +319,7 @@
      :jwt    (setting/get :jwt-enabled)
      :oidc   (setting/get :oidc-enabled)
      :slack  (setting/get :slack-connect-enabled)
+     :keycloak (setting/get :keycloak-auth-enabled)
      :scim   (setting/get :scim-enabled)
      ;; Unknown sso_source -- treat as disabled to allow password reset
      false)))

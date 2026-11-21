@@ -1,3 +1,4 @@
+// Modified by HudHud Maps, 2026-11-21: Keycloak sign-in types (AGPL).
 import type { CollectionId } from "./collection";
 import type { DashboardId } from "./dashboard";
 import type { DatabaseId } from "./database";
@@ -74,7 +75,16 @@ export interface User extends BaseUser {
   can_write_any_collection: boolean;
   personal_collection_id: CollectionId | null;
   tenant_collection_id: CollectionId | null;
-  sso_source: "jwt" | "ldap" | "google" | "scim" | "saml" | "oidc" | null;
+  // "keycloak": added by HudHud Maps, 2026-11-21 (Keycloak sign-in, AGPL)
+  sso_source:
+    | "jwt"
+    | "ldap"
+    | "google"
+    | "scim"
+    | "saml"
+    | "oidc"
+    | "keycloak"
+    | null;
   has_used_password?: boolean;
   custom_homepage: {
     dashboard_id: DashboardId;

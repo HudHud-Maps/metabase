@@ -2610,6 +2610,7 @@
   {:team "UX West"
    :module-exports #{sso.auth-identity}
    :api     #{metabase.sso.api
+              metabase.sso.api.keycloak
               metabase.sso.api.slack-connect
               metabase.sso.core
               metabase.sso.init
