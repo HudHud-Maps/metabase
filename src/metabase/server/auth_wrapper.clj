@@ -1,7 +1,9 @@
+;; Modified by HudHud Maps, 2026-11-21: added the /auth/sso/keycloak routes (Keycloak sign-in, AGPL; see metabase.sso.providers.keycloak).
 (ns metabase.server.auth-wrapper
   (:require
    [metabase.api.util.handlers :as handlers]
    [metabase.config.core :as config]
+   [metabase.sso.api.keycloak :as keycloak.api]
    [metabase.sso.api.slack-connect :as slack-connect.api]
    [ring.util.response :as response]))
 
@@ -25,6 +27,8 @@
   (handlers/routes
    ;; Slack Connect routes always available (OSS)
    (handlers/route-map-handler {"/auth" {"/sso" {"/slack-connect" slack-connect.api/routes}}})
+   ;; Keycloak (HudHud, AGPL) always available
+   (handlers/route-map-handler {"/auth" {"/sso" {"/keycloak" keycloak.api/routes}}})
    ;; Other SSO routes require EE
    (if (and config/ee-available? (not *compile-files*))
      (requiring-resolve 'metabase-enterprise.sso.api.routes/routes)
