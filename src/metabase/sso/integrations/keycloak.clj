@@ -16,6 +16,7 @@
    [metabase.sso.providers.keycloak]
    [metabase.sso.providers.slack-connect :as slack-connect.provider]
    [metabase.system.core :as system]
+   [metabase.util.encryption :as encryption]
    [metabase.util.i18n :refer [tru]]
    [metabase.util.log :as log]
    [ring.util.response :as response]))
@@ -30,6 +31,10 @@
     (throw (ex-info (tru "Keycloak sign-in is not configured.") {:status-code 400})))
   (when-not (system/site-url)
     (throw (ex-info (tru "Site URL is not set; Keycloak sign-in needs it for the callback address.")
+                    {:status-code 500})))
+  ;; the OIDC state cookie is encrypted with MB_ENCRYPTION_SECRET_KEY; without it the free OIDC code throws a bare 500
+  (when-not (encryption/default-encryption-enabled?)
+    (throw (ex-info (tru "MB_ENCRYPTION_SECRET_KEY is not set; Keycloak sign-in needs it to protect the sign-in state.")
                     {:status-code 500}))))
 
 (defn sso-initiate

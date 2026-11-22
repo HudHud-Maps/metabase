@@ -149,3 +149,50 @@
       (is (not (t2/exists? :model/User :email "kc-unverified@hudhud.sa")))))
   (testing "not configured"
     (is (= :keycloak-not-configured (:error (login! (claims "kc-x@hudhud.sa")))))))
+
+;;; -------------------------------------------------- Flow order --------------------------------------------------
+
+(deftest state-checked-before-code-exchange-and-nonce-enforced-test
+  (testing "the state cookie is checked before the code goes to Keycloak, and the ID token's nonce is checked"
+    (with-keycloak-env
+      (let [email  "kc-order@hudhud.sa"
+            calls  (atom [])
+            nonces (atom [])]
+        (try
+          (mt/with-dynamic-fn-redefs [oidc.discovery/discover-oidc-configuration (fn [_] discovery-doc)
+                                      oidc.state/validate-oidc-callback (fn [& _] (swap! calls conj :state)
+                                                                          {:valid? true :nonce "expected-nonce" :redirect "/"})
+                                      http/post (fn [_url _opts] (swap! calls conj :exchange)
+                                                  {:status 200 :body {:id_token "t" :access_token "a"}})
+                                      oidc.tokens/validate-id-token (fn [_ _ nonce] (swap! nonces conj nonce)
+                                                                      {:valid? true :claims (claims email)})]
+            (auth-identity/login! :provider/keycloak
+                                  {:code "c" :state "s"
+                                   :redirect-uri "https://metabase.example.com/auth/sso/keycloak/callback"
+                                   :device-info {:device_id "d" :device_description "test" :ip_address "127.0.0.1"
+                                                 :embedded false :token_exchange false}}))
+          (is (= [:state :exchange] (take 2 @calls)) "state first, then the code exchange")
+          (is (= ["expected-nonce"] @nonces) "the nonce from the state cookie reaches ID-token validation")
+          (finally (t2/delete! :model/User :email email)))))))
+
+(deftest invalid-state-never-reaches-keycloak-test
+  (testing "with a missing or forged state cookie the code is never sent to Keycloak and no account is made"
+    (with-keycloak-env
+      (let [calls (atom [])]
+        (mt/with-dynamic-fn-redefs [oidc.discovery/discover-oidc-configuration (fn [_] discovery-doc)
+                                    oidc.state/validate-oidc-callback (fn [& _] {:valid? false
+                                                                                 :error :invalid-or-expired-state
+                                                                                 :message "missing"})
+                                    http/post (fn [_url _opts] (swap! calls conj :exchange)
+                                                {:status 200 :body {:id_token "t"}})
+                                    oidc.tokens/validate-id-token (fn [& _] (swap! calls conj :token)
+                                                                    {:valid? true :claims (claims "kc-forged@hudhud.sa")})]
+          (let [result (auth-identity/login! :provider/keycloak
+                                             {:code "stolen" :state "forged"
+                                              :redirect-uri "https://metabase.example.com/auth/sso/keycloak/callback"
+                                              :device-info {:device_id "d" :device_description "test" :ip_address "127.0.0.1"
+                                                            :embedded false :token_exchange false}})]
+            (is (false? (:success? result)))
+            (is (nil? (:session result)))
+            (is (= [] @calls) "no code exchange, no token validation")
+            (is (not (t2/exists? :model/User :email "kc-forged@hudhud.sa")))))))))

@@ -12,6 +12,7 @@
    [metabase.permissions.core :as perms]
    [metabase.sso.common :as sso.common]
    [metabase.sso.keycloak.settings :as keycloak.settings]
+   [metabase.sso.oidc.state :as oidc.state]
    [metabase.util.i18n :refer [tru]]
    [metabase.util.log :as log]
    [methodical.core :as methodical]))
@@ -66,10 +67,32 @@
 
 ;;; -------------------------------------------------- Authentication --------------------------------------------------
 
+(defn- check-state-first
+  "On a callback, check the signed state cookie before anything else and pass its nonce on, so the code is only
+   exchanged, and the ID token only accepted, for a sign-in this browser started. Returns the request to continue
+   with, or a refusal.
+
+   (The free base flow runs `authenticate` before its own state check and without the nonce, so the ID token's nonce
+   would never be checked; this keeps that order right for Keycloak.)"
+  [request]
+  (if-not (or (contains? request :code) (contains? request :state))
+    request                                         ; starting a sign-in: nothing to check yet
+    (let [v (oidc.state/validate-oidc-callback request (:state request) :keycloak
+                                               {:validate-browser-id (:browser-id request)})]
+      (if (and (:valid? v) (:nonce v))
+        (cond-> (assoc request :oidc-nonce (:nonce v))
+          (and (:redirect v) (not (:redirect-url request))) (assoc :redirect-url (:redirect v)))
+        {:success? false
+         :error    (or (:error v) :invalid-state)
+         :message  (or (:message v) (tru "Your sign-in expired or was not started here. Please try again."))}))))
+
 (methodical/defmethod auth-identity/authenticate :provider/keycloak
   [provider request]
   (if-let [config (oidc-config request)]
-    (let [result (next-method provider (assoc request :oidc-config config))]
+    (let [request (check-state-first request)
+          result  (if (false? (:success? request))
+                    request
+                    (next-method provider (assoc request :oidc-config config)))]
       (if-not (and (true? (:success? result)) (:user-data result))
         result
         (let [claims (:claims result)
